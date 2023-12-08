@@ -29,8 +29,8 @@ type TrieAction {
 }
 
 type TrieDatum {
-  key: ByteArray,
-  children: List<ByteArray>,
+  TrieDatum { key: ByteArray, children: List<ByteArray> }
+  TrieOriginState { required_withdrawal: ByteArray }
 }
 
 fn get_trieid(v: Value, our_policy) -> ByteArray {
@@ -75,17 +75,24 @@ fn trie_handler(
     Genesis { inp: genesis_inp, oidx } -> {
       expect [] = trie_inputs
       let trie_id = builtin.blake2b_256(builtin.serialise_data(genesis_inp))
-      expect Some(Output {
-        value: new_value,
-        datum: InlineDatum(new_raw_datum),
+      expect [
+        Output { value: new_value, datum: InlineDatum(new_raw_datum), .. },
+        Output {
+          value: ostate_value,
+          datum: InlineDatum(origin_state_raw_datum),
+          ..
+        },
         ..
-      }) = outputs |> list.at(oidx)
+      ] = outputs |> list.drop(oidx)
       expect TrieDatum { key: new_key, children: new_children }: TrieDatum =
         new_raw_datum
+      expect TrieOriginState { .. }: TrieDatum = origin_state_raw_datum
       let new_id = get_trieid(new_value, this_policy)
+      let ostate_id = get_trieid(ostate_value, this_policy)
       and {
         // ids are correct
         new_id == trie_id,
+        ostate_id == trie_id,
         // input is in
         (
           inputs
