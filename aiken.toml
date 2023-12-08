@@ -1,0 +1,14 @@
+name = "anastasia-labs/aiken-trie"
+version = "0.0.0"
+license = "Apache-2.0"
+description = "Aiken contracts for project 'anastasia-labs/aiken-trie'"
+
+[repository]
+user = "anastasia-labs"
+project = "aiken-trie"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "1.7.0"
+source = "github"
