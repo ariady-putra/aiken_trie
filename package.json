@@ -1,0 +1,21 @@
+{
+  "name": "aiken-trie",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "aiken build && bun blueprint.ts && prettier -w ./plutus.ts",
+    "build:debug": "aiken build -k && bun blueprint.ts && prettier -w ./plutus.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0",
+    "prettier": "^3.0.3"
+  },
+  "dependencies": {
+    "lucid-cardano": "^0.10.7",
+    "prettier": "^3.1.1"
+  }
+}

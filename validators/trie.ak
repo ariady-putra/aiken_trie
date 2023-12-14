@@ -24,7 +24,7 @@ use aiken/transaction/value.{Value}
 
 type TrieAction {
   Genesis { inp: OutputReference, oidx: Int }
-  Between { head: OutputReference, oidx: Int }
+  Between { oidx: Int }
   Onto { oidx: Int }
 }
 
@@ -54,6 +54,19 @@ fn insert(self: List<a>, e: a, compare: fn(a, a) -> Ordering) -> List<a> {
   }
 }
 
+fn list_replace(self: List<a>, original: a, new: a) {
+  when self is {
+    [] ->
+      []
+    [x, ..xs] ->
+      if x == original {
+        [new, ..xs]
+      } else {
+        [x, ..list_replace(xs, original, new)]
+      }
+  }
+}
+
 // non-performant version. can introduce: multiple trie-actions, via a redeemer list. Can build up a tree from the inps, then flatten for output list
 fn trie_handler(
   this: StakeCredential,
@@ -68,9 +81,6 @@ fn trie_handler(
       |> list.filter(
            fn(inp) { inp.output.address.payment_credential == this_cred },
          )
-  let trie_outputs =
-    outputs
-      |> list.filter(fn(out) { out.address.payment_credential == this_cred })
   when redeemer is {
     Genesis { inp: genesis_inp, oidx } -> {
       expect [] = trie_inputs
@@ -91,26 +101,26 @@ fn trie_handler(
       let ostate_id = get_trieid(ostate_value, this_policy)
       and {
         // ids are correct
-        new_id == trie_id,
-        ostate_id == trie_id,
+        (new_id == trie_id)?,
+        (ostate_id == trie_id)?,
         // input is in
-        (
+        ((
           inputs
             |> list.find(
                  fn(inp: Input) -> Bool { inp.output_reference == genesis_inp },
                )
-        ) != None,
+        ) != None)?,
         // hash of input is minted
-        dict.to_list(value.tokens(mint |> value.from_minted_value, this_policy)) == [
-          (trie_id, 1),
-        ],
+        (dict.to_list(
+          value.tokens(mint |> value.from_minted_value, this_policy),
+        ) == [(trie_id, 2)])?,
         // no children
-        new_children == [],
+        (new_children == [])?,
         // empty key
-        new_key == "",
+        (new_key == "")?,
       }
     }
-    Onto { .. } -> {
+    Onto { oidx } -> {
       expect [
         Input {
           output: Output {
@@ -132,7 +142,8 @@ fn trie_handler(
           ..
         },
         Output { datum: InlineDatum(new_raw_datum), value: new_value, .. },
-      ] = trie_outputs
+        ..
+      ]: List<Output> = list.drop(outputs, oidx)
       expect TrieDatum { key: cont_key, children: cont_children }: TrieDatum =
         continuing_raw_datum
       expect TrieDatum { key: new_key, children: new_children }: TrieDatum =
@@ -169,44 +180,91 @@ fn trie_handler(
         ),
         // new utxo has 0 children
         new_children == [],
-        // 
-        True,
       }
     }
-    // datum prefixes new
-    _ -> fail
+    Between { oidx } -> {
+      expect [
+        Input {
+          output: Output {
+            datum: InlineDatum(parent_raw_datum),
+            value: parent_value,
+            ..
+          },
+          ..
+        },
+      ] = trie_inputs
+      expect TrieDatum { key: parent_key, children: parents_children }: TrieDatum =
+        parent_raw_datum
+      expect [
+        Output {
+          datum: InlineDatum(continuing_raw_datum),
+          value: cont_value,
+          ..
+        },
+        Output { datum: InlineDatum(new_raw_datum), value: new_value, .. },
+        ..
+      ]: List<Output> = list.drop(outputs, oidx)
+      expect TrieDatum { key: continuing_key, children: continuing_children }: TrieDatum =
+        continuing_raw_datum
+      expect TrieDatum { key: new_key, children: new_children }: TrieDatum =
+        new_raw_datum
+      let trie_id_cont = get_trieid(cont_value, this_policy)
+      let parent_key_length = parent_key |> bytearray.length
+      let new_key_suffix = new_key |> bytearray.drop(parent_key_length)
+      let new_key_suffix_first_char = new_key_suffix |> bytearray.slice(0, 1)
+      expect Some(child_key_suffix) =
+        parents_children
+          |> list.find(
+               fn(c_key) {
+                 bytearray.slice(c_key, 0, 1) == new_key_suffix_first_char
+               },
+             )
+      let new_child_key_suffix =
+        child_key_suffix |> bytearray.drop(new_key_suffix |> bytearray.length)
+      and {
+        // new_key prefixes child_key
+        (
+          child_key_suffix
+            |> bytearray.take(new_key_suffix |> bytearray.length)
+        ) == new_key_suffix,
+        // child_key isn't exactly new_key
+        (new_child_key_suffix != "")?,
+        // new_key isn't exactly parent_key
+        (new_key_suffix != "")?,
+        // parent prefixes new_Key
+        (parent_key == ( new_key |> bytearray.take(parent_key_length) ))?,
+        // parent key is unchanged
+        (continuing_key == parent_key)?,
+        // all values are in same trie_id
+        (trie_id_cont == get_trieid(new_value, this_policy))?,
+        (trie_id_cont == get_trieid(parent_value, this_policy))?,
+        // parent children updated sensibly
+        (continuing_children == list_replace(
+          parents_children,
+          child_key_suffix,
+          new_key_suffix,
+        ))?,
+        // child_key is in new_key's children
+        new_children == [new_child_key_suffix],
+      }
+    }
   }
-  //   when trie_inputs |> list.length is {
-  //     1 -> {
-  //       expect [Input { output: Output { address, value, .. }, .. }] = trie_inputs
-  //       expect
-  //         (
-  //           value
-  //             |> value.without_lovelace
-  //             |> value.tokens(this_policy)
-  //             |> dict.size
-  //         ) == 1
-  //       True
-  //     }
-  //     2 -> {
-  //       expect [Input { output: Output { address, value, .. }, .. }, ..] =
-  //         trie_inputs
-  //       expect
-  //         (
-  //           value
-  //             |> value.without_lovelace
-  //             |> value.tokens(this_policy)
-  //             |> dict.size
-  //         ) == 1
-  //       True
-  //     }
-  //     _ -> fail @"wrong number of trie inputs"
-  //   }
 }
 
 validator {
-  fn main(r: Data, c: ScriptContext) {
-    let ScriptContext { transaction, purpose } = c
+  fn spend(_d: Data, _r: Data, ctx: ScriptContext) {
+    expect ScriptContext {
+      transaction: Transaction { inputs, withdrawals, .. },
+      purpose: Spend(own_oref),
+    } = ctx
+    expect Some(self) =
+      inputs |> list.find(fn(inp) { inp.output_reference == own_oref })
+    withdrawals
+      |> dict.has_key(Inline(self.output.address.payment_credential))
+  }
+
+  fn main(r: Data, ctx: ScriptContext) {
+    let ScriptContext { transaction, purpose } = ctx
     when purpose is {
       Mint(policy_id) ->
         // validation happens in staking
@@ -216,17 +274,17 @@ validator {
         expect redeemer: TrieAction = r
         trie_handler(stake_cred, redeemer, transaction)
       }
-      _ -> fail @"bad purpose"
+      _ -> fail
     }
   }
+}
 
-  fn spend(_d: Data, _r: Data, ctx: ScriptContext) {
-    expect ScriptContext {
-      transaction: Transaction { inputs, withdrawals, .. },
-      purpose: Spend(own_oref),
-    } = ctx
-    expect Some(self) =
-      inputs |> list.find(fn(inp) { inp.output_reference == own_oref })
-    withdrawals |> dict.has_key(Inline(self.output.address.payment_credential))
+validator {
+  fn types_redeemer(_t: TrieAction, _ctx: Data) {
+    False
+  }
+
+  fn types_datum(_t: TrieDatum, _r: Data, _ctx: Data) {
+    False
   }
 }
