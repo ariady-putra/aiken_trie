@@ -111,14 +111,6 @@ bun test
 
 This guide demonstrates how to use the Trie for blockchain applications using lucid.
 
-### Setting up the environment
-
-First, ensure you have the necessary imports:
-
-```ts
-
-```
-
 ### Creating and Utilizing a Trie
 
 1.Constructing the Trie
