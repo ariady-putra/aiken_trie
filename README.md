@@ -21,7 +21,7 @@
 
 ## Introduction
 
-The Aiken Trie project provides a Aiken-based implementation of Tries for the Cardano blockchain. This project allows developers to leverage the security and efficiency of Tries in their Cardano smart contracts, ensuring data integrity and efficient data verification.
+The Aiken Trie project provides a Aiken-based implementation of Distributed Tries for the Cardano blockchain. This project allows developers to leverage the security and efficiency of Tries in their Cardano smart contracts, ensuring data integrity and efficient data verification. This project uniquely allows scalable data structures across multiple utxos, with a developer-friendly typescript api.
 
 This project is funded by the Cardano Treasury in [Catalyst Fund 10](https://projectcatalyst.io/funds/10/f10-osde-open-source-dev-ecosystem/anastasia-labs-the-trifecta-of-data-structures-tries-tries-and-linked-lists-for-cutting-edge-contracts) and is aimed at enhancing the capabilities of Cardano smart contracts in handling complex data structures.
 
@@ -66,7 +66,7 @@ This visual representation helps understand how Tries optimize space and search 
 
 ### Aiken Trie implementation
 
-The Aiken Trie implementation is a smart contract solution that allows the creation of many trie's from a single validator. You may attach additional business logic via the
+The Aiken Trie implementation is a smart contract solution that allows the creation of many distributed trie's from a single validator. You may attach additional business logic via the
 
 ## Getting Started
 
@@ -124,34 +124,45 @@ First, ensure you have the necessary imports:
 1.Constructing the Trie
 
 ```ts
-
+const trie = await createTrie(lucid, trieAddress, trieRewardAddress);
 ```
 
 2. Appending a new element to the Trie
 
 ```ts
-
+const trieOrigin = await getTrieOrigin(lucid, trie.trieUnit, trieAddress);
+const trieUtxo = await getUtxoByKey(lucid, trie.trieUnit, "", trieAddress);
+await appendTrie(
+  lucid,
+  trie.trieUnit,
+  trieOrigin!,
+  trieUtxo!,
+  "hello_world",
+  trieAddress,
+  trieRewardAddress,
+);
 ```
 
 3. Inserting an element between a parent and a child
 
 ```ts
-
+let newTrieUtxo = await getUtxoByKey(lucid, trie.trieUnit, "", trieAddress);
+await betweenTrie(
+  lucid,
+  trie.trieUnit,
+  trieOrigin!,
+  newTrieUtxo!,
+  "hello",
+  trieAddress,
+  trieRewardAddress,
+);
 ```
 
 ### Aiken On Chain
 
-The aiken on-chain is a reusable smart contract which doesn't need any modification or redeployment. You can write logical extensions using the "extend.ak" library like this in your withdrawal validators:
+The aiken on-chain is a reusable smart contract which doesn't need any modification or redeployment. You can write logical extensions in withdrawal validators, which uses the withdraw 0 trick.
 
-```aiken
-
-```
-
-The core script will require the invocation of your withdrawal validator if you initialise a trie with it correctly. This can be done like so:
-
-```ts
-
-```
+The core script will require the invocation of your withdrawal validator if you initialise a trie with it correctly. 
 
 ### Haskell On Chain
 
@@ -163,7 +174,7 @@ The main test file has e2e usage of the trie distributed structure here: [main.t
 
 ## Testing
 
-For comprehensive information on testing the Aiken Trie implementation, including unit tests and property-based tests, please refer to our [test documentation](/tests/README.md).
+Testing is documented literately in the [main test file](/tests/main.test.ts).
 
 # Case study
 
