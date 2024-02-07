@@ -36,7 +36,7 @@ describe("Synthetics", () => {
     lucid.selectWalletFromPrivateKey(TRIE_USER.privateKey);
   });
 
-  it("Should work", async () => {
+  it("Should pass e2e on creation, two insertions", async () => {
     let trie = await createTrie(lucid, trieAddress, trieRewardAddress);
     emulator.awaitBlock(1);
     let trieOrigin = await getTrieOrigin(lucid, trie.trieUnit, trieAddress);
@@ -63,7 +63,7 @@ describe("Synthetics", () => {
     );
   });
 
-  it("Should not allow duplicates 1", async () => {
+  it("Should fail on duplicate insertion (1)", async () => {
     let trie = await createTrie(lucid, trieAddress, trieRewardAddress);
     emulator.awaitBlock(1);
     let trieOrigin = await getTrieOrigin(lucid, trie.trieUnit, trieAddress);
@@ -96,7 +96,7 @@ describe("Synthetics", () => {
       });
   });
 
-  it("Should not allow duplicates 2", async () => {
+  it("Should fail on duplicate insertion (2)", async () => {
     let trie = await createTrie(lucid, trieAddress, trieRewardAddress);
     emulator.awaitBlock(1);
     let trieOrigin = await getTrieOrigin(lucid, trie.trieUnit, trieAddress);
