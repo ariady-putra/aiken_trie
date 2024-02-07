@@ -6,21 +6,25 @@ import {
   fromText,
   toText,
   toUnit,
-} from 'lucid-cardano'
-import { TrieDatum, TrieRedeemer } from './types'
-import { trieHash, trieScript } from './const'
-import { UTxOTokenName } from './utils'
-import * as plutus from '../plutus'
+} from "lucid-cardano";
+import { TrieDatum, TrieRedeemer } from "./types";
+import { trieHash, trieScript } from "./const";
+import { UTxOTokenName } from "./utils";
+import * as plutus from "../plutus";
 
-export async function createTrie(lucid: Lucid, trieAddress: string, trieRewardAddress: string) {
-  let utxos = await lucid.wallet.getUtxos()
-  let genesisUtxo = utxos[0]
+export async function createTrie(
+  lucid: Lucid,
+  trieAddress: string,
+  trieRewardAddress: string,
+) {
+  let utxos = await lucid.wallet.getUtxos();
+  let genesisUtxo = utxos[0];
   let genesisDatum: TrieDatum = {
     TrieDatum: {
-      key: '',
+      key: "",
       children: [],
     },
-  }
+  };
   let genesisRedeemer: TrieRedeemer = {
     Genesis: {
       inp: {
@@ -31,9 +35,9 @@ export async function createTrie(lucid: Lucid, trieAddress: string, trieRewardAd
       },
       oidx: 0n,
     },
-  }
-  let trieId = UTxOTokenName(genesisUtxo)
-  let trieUnit = toUnit(trieHash, trieId)
+  };
+  let trieId = UTxOTokenName(genesisUtxo);
+  let trieUnit = toUnit(trieHash, trieId);
   let tx = lucid
     .newTx()
     .collectFrom([genesisUtxo])
@@ -49,18 +53,18 @@ export async function createTrie(lucid: Lucid, trieAddress: string, trieRewardAd
       trieAddress,
       {
         inline: Data.to(
-          { TrieOriginState: { requiredWithdrawal: '' } },
+          { TrieOriginState: { requiredWithdrawal: "" } },
           TrieDatum,
         ),
       },
       { [trieUnit]: 1n },
-    )
-  let txc = await tx.complete()
-  let txS = await txc.sign().complete()
-  await txS.submit()
+    );
+  let txc = await tx.complete();
+  let txS = await txc.sign().complete();
+  await txS.submit();
   return {
     trieUnit,
-  }
+  };
 }
 
 export async function getUtxoByKey(
@@ -69,16 +73,16 @@ export async function getUtxoByKey(
   key: string,
   trieAddress: string,
 ): Promise<UTxO | null> {
-  let trieUtxo = await lucid.utxosAtWithUnit(trieAddress, id)
+  let trieUtxo = await lucid.utxosAtWithUnit(trieAddress, id);
   for (let utxo of trieUtxo) {
-    let datum = Data.from(utxo.datum!, TrieDatum)
-    if ('TrieDatum' in datum) {
+    let datum = Data.from(utxo.datum!, TrieDatum);
+    if ("TrieDatum" in datum) {
       if (datum.TrieDatum.key == fromText(key)) {
-        return utxo
+        return utxo;
       }
     }
   }
-  return null
+  return null;
 }
 
 export async function getTrieOrigin(
@@ -86,14 +90,14 @@ export async function getTrieOrigin(
   id: Unit,
   trieAddress: string,
 ): Promise<UTxO | null> {
-  let trieUtxo = await lucid.utxosAtWithUnit(trieAddress, id)
+  let trieUtxo = await lucid.utxosAtWithUnit(trieAddress, id);
   for (let utxo of trieUtxo) {
-    let datum = Data.from(utxo.datum!, TrieDatum)
-    if ('TrieOrigin' in datum) {
-      return utxo
+    let datum = Data.from(utxo.datum!, TrieDatum);
+    if ("TrieOrigin" in datum) {
+      return utxo;
     }
   }
-  return null
+  return null;
 }
 
 export async function appendTrie(
@@ -103,15 +107,15 @@ export async function appendTrie(
   utxo: UTxO,
   child_key: string,
   trieAddress: string,
-  trieRewardAddress: string
+  trieRewardAddress: string,
 ) {
-  let parentDatum = Data.from(utxo.datum!, TrieDatum)
-  if (!('TrieDatum' in parentDatum)) {
-    return
+  let parentDatum = Data.from(utxo.datum!, TrieDatum);
+  if (!("TrieDatum" in parentDatum)) {
+    return;
   }
   let appendRedeemer: TrieRedeemer = {
     Onto: { oidx: 0n },
-  }
+  };
   let newParentDatum: TrieDatum = {
     TrieDatum: {
       key: parentDatum.TrieDatum.key,
@@ -120,18 +124,18 @@ export async function appendTrie(
         fromText(child_key.slice(parentDatum.TrieDatum.key.length)),
       ].sort(),
     },
-  }
+  };
   let childDatum: TrieDatum = {
     TrieDatum: {
       key: fromText(child_key),
       children: [],
     },
-  }
+  };
   let tx = lucid
     .newTx()
     .collectFrom(
       [utxo],
-      Data.to({ wrapper: Data.void() }, plutus.TrieSpend['_r']),
+      Data.to({ wrapper: Data.void() }, plutus.TrieSpend["_r"]),
     )
     .withdraw(trieRewardAddress, 0n, Data.to(appendRedeemer, TrieRedeemer))
     .mintAssets({ [trieUnit]: 1n }, Data.void())
@@ -145,10 +149,10 @@ export async function appendTrie(
       trieAddress,
       { inline: Data.to(childDatum, TrieDatum) },
       { [trieUnit]: 1n },
-    )
-  let txc = await tx.complete()
-  let txS = await txc.sign().complete()
-  await txS.submit()
+    );
+  let txc = await tx.complete();
+  let txS = await txc.sign().complete();
+  await txS.submit();
 }
 
 export async function betweenTrie(
@@ -160,23 +164,23 @@ export async function betweenTrie(
   trieAddress: string,
   trieRewardAddress: string,
 ) {
-  let parentDatum = Data.from(utxo.datum!, TrieDatum)
-  if (!('TrieDatum' in parentDatum)) {
-    return
+  let parentDatum = Data.from(utxo.datum!, TrieDatum);
+  if (!("TrieDatum" in parentDatum)) {
+    return;
   }
   let appendRedeemer: TrieRedeemer = {
     Between: { oidx: 0n },
-  }
-  let parentKey = toText(parentDatum.TrieDatum.key)
-  let replacing: string | undefined
+  };
+  let parentKey = toText(parentDatum.TrieDatum.key);
+  let replacing: string | undefined;
   for (let child of parentDatum.TrieDatum.children) {
-    let key = toText(child)
+    let key = toText(child);
     if (key.slice(0, 1) == child_key.slice(parentKey.length).slice(0, 1)) {
-      replacing = key
+      replacing = key;
     }
   }
   if (!replacing) {
-    throw 'parent did not have conflicting child key'
+    throw new Error("Parent did not have conflicting child key");
   }
   let newParentDatum: TrieDatum = {
     TrieDatum: {
@@ -186,18 +190,18 @@ export async function betweenTrie(
         fromText(child_key.slice(parentDatum.TrieDatum.key.length)),
       ].sort(),
     },
-  }
+  };
   let childDatum: TrieDatum = {
     TrieDatum: {
       key: fromText(child_key),
       children: [fromText((parentKey + replacing).slice(child_key.length))],
     },
-  }
+  };
   let tx = lucid
     .newTx()
     .collectFrom(
       [utxo],
-      Data.to({ wrapper: Data.void() }, plutus.TrieSpend['_r']),
+      Data.to({ wrapper: Data.void() }, plutus.TrieSpend["_r"]),
     )
     .withdraw(trieRewardAddress, 0n, Data.to(appendRedeemer, TrieRedeemer))
     .mintAssets({ [trieUnit]: 1n }, Data.void())
@@ -211,10 +215,8 @@ export async function betweenTrie(
       trieAddress,
       { inline: Data.to(childDatum, TrieDatum) },
       { [trieUnit]: 1n },
-    )
-  let txc = await tx.complete()
-  console.log('EXUNITS insertion', txc.exUnits)
-  console.log('SIZE', txc.toString().length / 2)
-  let txS = await txc.sign().complete()
-  await txS.submit()
+    );
+  let txc = await tx.complete();
+  let txS = await txc.sign().complete();
+  await txS.submit();
 }

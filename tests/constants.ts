@@ -1,4 +1,4 @@
-import { ProtocolParameters } from "lucid-cardano"
+import { ProtocolParameters } from "lucid-cardano";
 
 export const defaultProtocolParams: ProtocolParameters = {
   minFeeA: 44,
@@ -361,4 +361,4 @@ export const defaultProtocolParams: ProtocolParameters = {
       "verifySchnorrSecp256k1Signature-memory-arguments": 10,
     },
   },
-}
+};

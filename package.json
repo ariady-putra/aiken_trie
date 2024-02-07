@@ -5,7 +5,8 @@
   "scripts": {
     "build": "aiken build && bun blueprint.ts && prettier -w ./plutus.ts",
     "build:debug": "aiken build -t verbose && bun blueprint.ts && prettier -w ./plutus.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "fmt": "pnpm exec prettier --write ."
   },
   "devDependencies": {
     "bun-types": "latest",
