@@ -13,8 +13,19 @@ jobs:
 
       - uses: aiken-lang/setup-aiken@v0.1.0
         with:
-          version: v1
+          version: v1.0.24-alpha
 
       - run: aiken fmt --check
       - run: aiken check -D
       - run: aiken build
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Deploy Contracts
+        run: |
+          bun run build
+          bun test
