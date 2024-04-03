@@ -103,7 +103,7 @@ Execute the test suite:
 bun test
 ```
 
-![aiken-trie.png](/assets/images/aiken-trie.png)
+![aiken-trie.gif](/assets/images/aiken-trie.gif)
 
 # Tutorial
 
@@ -156,10 +156,6 @@ The aiken on-chain is a reusable smart contract which doesn't need any modificat
 
 The core script will require the invocation of your withdrawal validator if you initialise a trie with it correctly. 
 
-### Haskell On Chain
-
-The haskell on-chain is unimplemented.
-
 ### Sample usage
 
 The main test file has e2e usage of the trie distributed structure here: [main.test.ts](/tests/main.test.ts).
@@ -167,9 +163,3 @@ The main test file has e2e usage of the trie distributed structure here: [main.t
 ## Testing
 
 Testing is documented literately in the [main test file](/tests/main.test.ts).
-
-# Case study
-
-For an in-depth real-world case study on the application of Tries within the Cardano blockchain environment, refer to the following resource:
-
-- incomplete
