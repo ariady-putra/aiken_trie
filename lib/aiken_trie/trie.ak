@@ -32,8 +32,8 @@ pub fn trie_handler(
   let trie_inputs =
     inputs
       |> list.filter(
-           fn(inp) { inp.output.address.payment_credential == this_cred },
-         )
+          fn(inp) { inp.output.address.payment_credential == this_cred },
+        )
   when redeemer is {
     types.Genesis { inp: genesis_inp, oidx } -> {
       expect [] = trie_inputs
@@ -61,8 +61,8 @@ pub fn trie_handler(
         ((
           inputs
             |> list.find(
-                 fn(inp: Input) -> Bool { inp.output_reference == genesis_inp },
-               )
+                fn(inp: Input) -> Bool { inp.output_reference == genesis_inp },
+              )
         ) != None)?,
         // hash of input is minted
         (dict.to_list(
@@ -90,6 +90,7 @@ pub fn trie_handler(
         raw_datum
       let head_key = utils.to_hex(raw_head_key)
       let head_key_length = head_key |> bytearray.length
+      let expected_outputs = list.drop(outputs, oidx)
       expect [
         Output {
           datum: InlineDatum(continuing_raw_datum),
@@ -98,7 +99,7 @@ pub fn trie_handler(
         },
         Output { datum: InlineDatum(new_raw_datum), value: new_value, .. },
         ..
-      ]: List<Output> = list.drop(outputs, oidx)
+      ]: List<Output> = expected_outputs
       expect types.TrieDatum { key: raw_cont_key, children: cont_children }: types.TrieDatum =
         continuing_raw_datum
       let cont_key = utils.to_hex(raw_cont_key)
@@ -154,6 +155,7 @@ pub fn trie_handler(
       expect types.TrieDatum { key: raw_parent_key, children: parents_children }: types.TrieDatum =
         parent_raw_datum
       let parent_key = utils.to_hex(raw_parent_key)
+      let expected_outputs = list.drop(outputs, oidx)
       expect [
         Output {
           datum: InlineDatum(continuing_raw_datum),
@@ -162,7 +164,7 @@ pub fn trie_handler(
         },
         Output { datum: InlineDatum(new_raw_datum), value: new_value, .. },
         ..
-      ]: List<Output> = list.drop(outputs, oidx)
+      ]: List<Output> = expected_outputs
       expect types.TrieDatum {
         key: raw_continuing_key,
         children: continuing_children,
@@ -178,10 +180,10 @@ pub fn trie_handler(
       expect Some(raw_child_key_suffix) =
         parents_children
           |> list.find(
-               fn(c_key) {
-                 bytearray.slice(c_key |> utils.to_hex, 0, 1) == new_key_suffix_first_char
-               },
-             )
+              fn(c_key) {
+                bytearray.slice(c_key |> utils.to_hex, 0, 1) == new_key_suffix_first_char
+              },
+            )
       let child_key_suffix = utils.to_hex(raw_child_key_suffix)
       let new_child_key_suffix =
         child_key_suffix |> bytearray.drop(new_key_suffix |> bytearray.length)
