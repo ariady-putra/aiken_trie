@@ -1,19 +1,19 @@
 use aiken/builtin
-use aiken/dict
-use aiken/transaction/value.{Value}
+use aiken/collection/dict
+use cardano/assets.{Value}
 
 pub fn get_trieid(v: Value, our_policy: ByteArray) -> ByteArray {
-  expect [_ada, (shouldbe_our_policy, ourpolicy_dict)] =
-    v |> value.to_dict |> dict.to_list
-  expect [(trie_id, 1)] = ourpolicy_dict |> dict.to_list
+  expect [_ada,
+    Pair(shouldbe_our_policy, ourpolicy_dict)] =
+    v |> assets.to_dict |> dict.to_pairs
   expect shouldbe_our_policy == our_policy
+  expect [Pair(trie_id, 1)] = ourpolicy_dict |> dict.to_pairs
   trie_id
 }
 
 pub fn insert(self: List<a>, e: a, compare: fn(a, a) -> Ordering) -> List<a> {
   when self is {
-    [] ->
-      [e]
+    [] -> [e]
     [x, ..xs] ->
       if compare(e, x) == Less {
         [e, ..self]
@@ -25,8 +25,7 @@ pub fn insert(self: List<a>, e: a, compare: fn(a, a) -> Ordering) -> List<a> {
 
 pub fn list_replace(self: List<a>, original: a, new: a) {
   when self is {
-    [] ->
-      []
+    [] -> []
     [x, ..xs] ->
       if x == original {
         [new, ..xs]
@@ -37,8 +36,7 @@ pub fn list_replace(self: List<a>, original: a, new: a) {
 }
 
 pub fn to_hex(self: ByteArray) -> ByteArray {
-  self
-    |> encode_base16(builtin.length_of_bytearray(self) - 1, "")
+  self |> encode_base16(builtin.length_of_bytearray(self) - 1, "")
 }
 
 fn encode_base16(bytes: ByteArray, ix: Int, builder: ByteArray) -> ByteArray {

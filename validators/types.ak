@@ -1,11 +1,17 @@
 use aiken_trie/types
 
-validator {
-  fn redeemer(_trie_action: types.TrieAction, _c) {
+validator datum_redeemer {
+  /// Redeemer
+  mint(_trie_action: types.TrieAction, _p, _t) {
     False
   }
 
-  fn datum(_trie_datum: types.TrieDatum, _, _c) {
+  /// Datum
+  spend(_trie_datum: Option<types.TrieDatum>, _r, _o, _t) {
     False
+  }
+
+  else(_) {
+    fail
   }
 }

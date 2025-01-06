@@ -1,4 +1,4 @@
-use aiken/transaction.{OutputReference}
+use cardano/transaction.{OutputReference}
 
 pub type TrieAction {
   Genesis { inp: OutputReference, oidx: Int }

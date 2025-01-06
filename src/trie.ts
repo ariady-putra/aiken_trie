@@ -1,180 +1,137 @@
-import {
-  Data,
-  Lucid,
-  UTxO,
-  Unit,
-  fromText,
-  toText,
-  toUnit,
-} from "lucid-cardano";
+import { Data, LucidEvolution, UTxO, Unit, fromHex, fromText, toText, toUnit } from "@lucid-evolution/lucid";
 import { TrieDatum, TrieRedeemer } from "./types";
 import { trieHash, trieScript } from "./const";
 import { UTxOTokenName } from "./utils";
 import * as plutus from "../plutus";
 
-export async function createTrie(
-  lucid: Lucid,
-  trieAddress: string,
-  trieRewardAddress: string,
-) {
-  let utxos = await lucid.wallet.getUtxos();
-  let genesisUtxo = utxos[0];
-  let genesisDatum: TrieDatum = {
-    TrieDatum: {
-      key: "",
-      children: [],
-    },
-  };
-  let genesisRedeemer: TrieRedeemer = {
+export async function createTrie(lucid: LucidEvolution, trieAddress: string, trieRewardAddress: string) {
+  const utxos = await lucid.wallet().getUtxos();
+  const genesisUtxo = utxos[0];
+  const genesisDatum: TrieDatum = { TrieDatum: { key: "", children: [] } };
+  const genesisRedeemer: TrieRedeemer = {
     Genesis: {
       inp: {
-        transactionId: {
-          hash: genesisUtxo.txHash,
-        },
+        transactionId: String(genesisUtxo.txHash),
         outputIndex: BigInt(genesisUtxo.outputIndex),
       },
       oidx: 0n,
     },
   };
-  let trieId = UTxOTokenName(genesisUtxo);
-  let trieUnit = toUnit(trieHash, trieId);
-  let tx = lucid
+
+  const trieId = UTxOTokenName(genesisUtxo);
+  const trieUnit = toUnit(trieHash, trieId);
+
+  const tx = await lucid
     .newTx()
     .collectFrom([genesisUtxo])
-    .withdraw(trieRewardAddress, 0n, Data.to(genesisRedeemer, TrieRedeemer))
     .mintAssets({ [trieUnit]: 2n }, Data.void())
-    .attachWithdrawalValidator(trieScript)
-    .payToContract(
-      trieAddress,
-      { inline: Data.to(genesisDatum, TrieDatum) },
-      { [trieUnit]: 1n },
-    )
-    .payToContract(
-      trieAddress,
-      {
-        inline: Data.to(
-          { TrieOriginState: { requiredWithdrawal: "" } },
-          TrieDatum,
-        ),
-      },
-      { [trieUnit]: 1n },
-    );
-  let txc = await tx.complete();
-  let txS = await txc.sign().complete();
-  await txS.submit();
-  return {
-    trieUnit,
-  };
+    // .attachMintingPolicy(trieScript)
+    .withdraw(trieRewardAddress, (await lucid.delegationAt(trieRewardAddress)).rewards, Data.to(genesisRedeemer, TrieRedeemer))
+    .attach.WithdrawalValidator(trieScript)
+    .pay.ToContract(trieAddress, { kind: "inline", value: Data.to(genesisDatum, TrieDatum) }, { [trieUnit]: 1n })
+    .pay.ToContract(trieAddress, { kind: "inline", value: Data.to({ TrieOriginState: { requiredWithdrawal: "" } }, TrieDatum) }, { [trieUnit]: 1n })
+    .complete();
+
+  const txS = await tx.sign.withWallet().complete();
+  const txH = await txS.submit();
+  console.log("createTrie:", txH);
+
+  return { trieUnit };
 }
 
-export async function getUtxoByKey(
-  lucid: Lucid,
-  id: Unit,
-  key: string,
-  trieAddress: string,
-): Promise<UTxO | null> {
-  let trieUtxo = await lucid.utxosAtWithUnit(trieAddress, id);
-  for (let utxo of trieUtxo) {
-    let datum = Data.from(utxo.datum!, TrieDatum);
+export async function getUtxoByKey(lucid: LucidEvolution, id: Unit, key: string, trieAddress: string): Promise<UTxO | null> {
+  const trieUtxo = await lucid.utxosAtWithUnit(trieAddress, id);
+  for (const utxo of trieUtxo) {
+    const datum = Data.from(utxo.datum!, TrieDatum);
     if ("TrieDatum" in datum) {
-      if (datum.TrieDatum.key == fromText(key)) {
+      if (toText(datum.TrieDatum.key) == key) {
         return utxo;
       }
     }
   }
+
   return null;
 }
 
-export async function getTrieOrigin(
-  lucid: Lucid,
-  id: Unit,
-  trieAddress: string,
-): Promise<UTxO | null> {
-  let trieUtxo = await lucid.utxosAtWithUnit(trieAddress, id);
-  for (let utxo of trieUtxo) {
-    let datum = Data.from(utxo.datum!, TrieDatum);
+export async function getTrieOrigin(lucid: LucidEvolution, id: Unit, trieAddress: string): Promise<UTxO | null> {
+  const trieUtxo = await lucid.utxosAtWithUnit(trieAddress, id);
+  for (const utxo of trieUtxo) {
+    const datum = Data.from(utxo.datum!, TrieDatum);
     if ("TrieOrigin" in datum) {
       return utxo;
     }
   }
+
   return null;
 }
 
 export async function appendTrie(
-  lucid: Lucid,
+  lucid: LucidEvolution,
   trieUnit: string,
   trieOrigin: UTxO,
   utxo: UTxO,
   child_key: string,
   trieAddress: string,
-  trieRewardAddress: string,
+  trieRewardAddress: string
 ) {
-  let parentDatum = Data.from(utxo.datum!, TrieDatum);
+  const parentDatum = Data.from(utxo.datum!, TrieDatum);
   if (!("TrieDatum" in parentDatum)) {
     return;
   }
-  let appendRedeemer: TrieRedeemer = {
-    Onto: { oidx: 0n },
-  };
-  let newParentDatum: TrieDatum = {
+
+  const newParentDatum: TrieDatum = {
     TrieDatum: {
       key: parentDatum.TrieDatum.key,
-      children: [
-        ...parentDatum.TrieDatum.children,
-        fromText(child_key.slice(parentDatum.TrieDatum.key.length)),
-      ].sort(),
+      children: [...parentDatum.TrieDatum.children, fromText(child_key.slice(parentDatum.TrieDatum.key.length))].sort(),
     },
   };
-  let childDatum: TrieDatum = {
+  const childDatum: TrieDatum = {
     TrieDatum: {
       key: fromText(child_key),
       children: [],
     },
   };
-  let tx = lucid
+
+  const appendRedeemer: TrieRedeemer = { Onto: { oidx: 0n } };
+
+  const tx = await lucid
     .newTx()
-    .collectFrom(
-      [utxo],
-      Data.to({ wrapper: Data.void() }, plutus.TrieSpend["_r"]),
-    )
-    .withdraw(trieRewardAddress, 0n, Data.to(appendRedeemer, TrieRedeemer))
+    .collectFrom([utxo], Data.to({ wrapper: Data.void() }, plutus.TrieSpend["_r"]))
+    // .attachSpendingValidator(trieScript)
     .mintAssets({ [trieUnit]: 1n }, Data.void())
-    .attachSpendingValidator(trieScript)
-    .payToContract(
-      trieAddress,
-      { inline: Data.to(newParentDatum, TrieDatum) },
-      { [trieUnit]: 1n },
-    )
-    .payToContract(
-      trieAddress,
-      { inline: Data.to(childDatum, TrieDatum) },
-      { [trieUnit]: 1n },
-    );
-  let txc = await tx.complete();
-  let txS = await txc.sign().complete();
-  await txS.submit();
+    // .attachMintingPolicy(trieScript)
+    .withdraw(trieRewardAddress, (await lucid.delegationAt(trieRewardAddress)).rewards, Data.to(appendRedeemer, TrieRedeemer))
+    .attach.WithdrawalValidator(trieScript)
+    .pay.ToContract(trieAddress, { kind: "inline", value: Data.to(newParentDatum, TrieDatum) }, { [trieUnit]: 1n })
+    .pay.ToContract(trieAddress, { kind: "inline", value: Data.to(childDatum, TrieDatum) }, { [trieUnit]: 1n })
+    .complete();
+
+  const txS = await tx.sign.withWallet().complete();
+  const txH = await txS.submit();
+  console.log("appendTrie:", txH);
+
+  return txH;
 }
 
 export async function betweenTrie(
-  lucid: Lucid,
+  lucid: LucidEvolution,
   trieUnit: string,
   trieOrigin: UTxO,
   utxo: UTxO,
   child_key: string,
   trieAddress: string,
-  trieRewardAddress: string,
+  trieRewardAddress: string
 ) {
-  let parentDatum = Data.from(utxo.datum!, TrieDatum);
+  const parentDatum = Data.from(utxo.datum!, TrieDatum);
   if (!("TrieDatum" in parentDatum)) {
     return;
   }
-  let appendRedeemer: TrieRedeemer = {
-    Between: { oidx: 0n },
-  };
-  let parentKey = toText(parentDatum.TrieDatum.key);
+
+  const parentKey = toText(parentDatum.TrieDatum.key);
+
   let replacing: string | undefined;
-  for (let child of parentDatum.TrieDatum.children) {
-    let key = toText(child);
+  for (const child of parentDatum.TrieDatum.children) {
+    const key = toText(child);
     if (key.slice(0, 1) == child_key.slice(parentKey.length).slice(0, 1)) {
       replacing = key;
     }
@@ -182,41 +139,37 @@ export async function betweenTrie(
   if (!replacing) {
     throw new Error("Parent did not have conflicting child key");
   }
-  let newParentDatum: TrieDatum = {
+
+  const newParentDatum: TrieDatum = {
     TrieDatum: {
       key: fromText(parentDatum.TrieDatum.key),
-      children: [
-        ...parentDatum.TrieDatum.children.filter((x) => toText(x) != replacing),
-        fromText(child_key.slice(parentDatum.TrieDatum.key.length)),
-      ].sort(),
+      children: [...parentDatum.TrieDatum.children.filter((x) => toText(x) != replacing), fromText(child_key.slice(parentDatum.TrieDatum.key.length))].sort(),
     },
   };
-  let childDatum: TrieDatum = {
+  const childDatum: TrieDatum = {
     TrieDatum: {
       key: fromText(child_key),
       children: [fromText((parentKey + replacing).slice(child_key.length))],
     },
   };
-  let tx = lucid
+
+  const appendRedeemer: TrieRedeemer = { Between: { oidx: 0n } };
+
+  const tx = await lucid
     .newTx()
-    .collectFrom(
-      [utxo],
-      Data.to({ wrapper: Data.void() }, plutus.TrieSpend["_r"]),
-    )
-    .withdraw(trieRewardAddress, 0n, Data.to(appendRedeemer, TrieRedeemer))
+    .collectFrom([utxo], Data.to({ wrapper: Data.void() }, plutus.TrieSpend["_r"]))
+    // .attachSpendingValidator(trieScript)
     .mintAssets({ [trieUnit]: 1n }, Data.void())
-    .attachSpendingValidator(trieScript)
-    .payToContract(
-      trieAddress,
-      { inline: Data.to(newParentDatum, TrieDatum) },
-      { [trieUnit]: 1n },
-    )
-    .payToContract(
-      trieAddress,
-      { inline: Data.to(childDatum, TrieDatum) },
-      { [trieUnit]: 1n },
-    );
-  let txc = await tx.complete();
-  let txS = await txc.sign().complete();
-  await txS.submit();
+    // .attachMintingPolicy(trieScript)
+    .withdraw(trieRewardAddress, (await lucid.delegationAt(trieRewardAddress)).rewards, Data.to(appendRedeemer, TrieRedeemer))
+    .attach.WithdrawalValidator(trieScript)
+    .pay.ToContract(trieAddress, { kind: "inline", value: Data.to(newParentDatum, TrieDatum) }, { [trieUnit]: 1n })
+    .pay.ToContract(trieAddress, { kind: "inline", value: Data.to(childDatum, TrieDatum) }, { [trieUnit]: 1n })
+    .complete();
+
+  const txS = await tx.sign.withWallet().complete();
+  const txH = await txS.submit();
+  console.log("betweenTrie:", txH);
+
+  return txH;
 }
